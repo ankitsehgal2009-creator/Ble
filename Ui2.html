@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<title>CryostatControl</title>
+<style>
+  /* Reset & base */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    font-size: 16px;
+    background: #f8fafb;
+    color: #222;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f0f3f5;
+    user-select: none;
+  }
+  :root {
+    --accent-color: #238a9b;
+    --gray-light: #e5e9eb;
+    --gray-mid: #a9b4b8;
+    --gray-dark: #444a4e;
+    --warn-color: #f5a623;
+    --alert-color: #d9534f;
+    --ok-color: #3db964;
+    --bg-card: #fff;
+    --shadow: rgba(0,0,0,0.12);
+    --font-large: 1.5rem;
+    --font-xlarge: 2.6rem;
+    --transition: 0.2s ease;
+    --border-radius: 8px;
+    --touch-min-size: 44px;
+  }
+  :focus-visible {
+    outline: 3px solid var(--accent-color);
+    outline-offset: 2px;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100vh;
+    max-width: 960px;
+    margin: 0 auto;
+    background: var(--bg-card);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  /* HEADER */
+  header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: var(--accent-color);
+    color: white;
+    user-select: none;
+  }
+  header .title-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header h1 {
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin: 0;
+    line-height: 1;
+  }
+  header .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  header .status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #d9534f;
+  }
+  header .status-connected {
+    background-color: var(--ok-color);
+  }
+  header button.menu-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: white;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  header button.menu-btn svg {
+    fill: white;
+    width: 24px;
+    height: 24px;
+  }
+  header .last-update {
+    font-size: 0.85rem;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-left: 10px;
+  }
+
+  /* LAYOUT */
+  main#main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--gray-light);
+  }
+  /* Parameter Dashboard container */
+  #param-dashboard {
+    padding: 8px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--gray-light);
+    border-bottom: 1px solid var(--gray-mid);
+  }
+  #param-dashboard-inner {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap; /* allow wrap so micron control fits nicely */
+  }
+
+  /* Parameter card */
+  .param-card {
+    background: var(--bg-card);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 5px var(--shadow);
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    min-width: 120px;
+    max-width: 150px;
+    user-select: none;
+    font-weight: 700;
+    color: var(--gray-dark);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .param-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.2;
+    color: var(--gray-dark);
+  }
+  .param-value-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: space-between;
+  }
+  .param-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--accent-color);
+    user-select: text;
+  }
+  .param-units {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--gray-mid);
+    user-select: text;
+  }
+  .trend-icon {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    user-select: none;
+  }
+  .trend-up {
+    color: #3db964;
+  }
+  .trend-down {
+    color: #d9534f;
+  }
+  .status-dot-small {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-ok {
+    background-color: var(--ok-color);
+  }
+  .status-warn {
+    background-color: var(--warn-color);
+  }
+  .status-alert {
+    background-color: var(--alert-color);
+  }
+  /* Tooltip */
+  .tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+  }
+  .tooltip .tooltip-text {
+    visibility: hidden;
+    background-color: var(--gray-dark);
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 7px;
+    position: absolute;
+    z-index: 10;
+    bottom: 115%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 160px;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .tooltip:hover .tooltip-text,
+  .tooltip:focus-within .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* MICRON CUT SIZE CONTROL */
+  .micron-control {
+    background: var(--bg-card);
+    box-shadow: 0 2px 5px var(--shadow);
+    border-radius: var(--border-radius);
+    padding: 10px 12px;
+    width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    user-select: none;
+  }
+  .micron-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--gray-dark);
+  }
+  .micron-input-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .micron-btn {
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    font-size: 1.4rem;
+    line-height: 1;
+    height: 44px;
+    width: 44px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .micron-btn:active,
+  .micron-btn:focus-visible {
+    background: #1a6872;
+    outline: none;
+  }
+  .micron-input {
+    flex-grow: 1;
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 6px 8px;
+    border: 2px solid var(--gray-mid);
+    border-radius: var(--border-radius);
+    text-align: center;
+    outline-offset: 2px;
+  }
+  .micron-input:focus {
+    border-color: var(--accent-color);
+    outline: none;
+  }
+  .micron-desc {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--gray-mid);
+  }
+
+  /* MAIN STATUS PANEL */
+  #main-status-panel {
+    background: white;
+    box-shadow: 0 2px 8px var(--shadow);
+    margin: 10px 12px;
+    border-radius: var(--border-radius);
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #cut-count {
+    font-size: var(--font-large);
+    font-weight: 900;
+    color: var(--accent-color);
+    margin-bottom: 6px;
+    user-select: text;
+  }
+  #machine-mode {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--gray-dark);
+    margin-bottom: 20px;
+    user-select: text;
+  }
+  #cooldown-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+  }
+  #cooldown-svg {
+    width: 100%;
+    height: 100%;
+  }
+  #cooldown-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--accent-color);
+    user-select: text;
+  }
+
+  /* CONTROLS */
+  #controls-area {
+    background: var(--gray-light);
+    padding: 6px 12px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    margin-top: auto;
+    flex-shrink: 0;
+  }
+  #controls-area button {
+    min-width: var(--touch-min-size);
+    min-height: var(--touch-min-size);
+    flex-grow: 1;
+    background: linear-gradient(145deg, #cde6ea, #1f717f);
+    border: none;
+    border-radius: var(--border-radius);
+    color: white;
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: 3px 3px 6px #1b5a67, -3px -3px 6px #2a98a9;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    padding: 8px 4px;
+  }
+  #controls-area button:active,
+  #controls-area button:focus-visible {
+    outline: none;
+    transform: translateY(2px);
+    box-shadow: inset 2px 2px 6px #17515c, inset -2px -2px 6px #3695a0;
+  }
+
+  /* JOYSTICK */
+  #joystick-area {
+    background: var(--gray-light);
+    padding: 8px 12px 12px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+  }
+  #joystick-label {
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: var(--gray-dark);
+  }
+  #joystick-container {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    touch-action: none;
+  }
+  #joystick-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 3px solid var(--accent-color);
+    border-radius: 50%;
+    box-sizing: border-box;
+  }
+  #joystick-knob {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25);
+    transition: transform 0.1s ease;
+    touch-action: none;
+    cursor: grab;
+  }
+  #joystick-knob:active {
+    cursor: grabbing;
+  }
+  #joystick-output {
+    margin-top: 6px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    user-select: text;
+  }
+
+  /* MEDIA QUERIES */
+  @media (min-width: 600px) and (orientation: landscape) {
+    #main-content {
+      flex-direction: row;
+      gap: 10px;
+      padding: 12px;
+    }
+    #param-dashboard {
+      padding: 0;
+      border: none;
+      overflow-x: visible;
+      flex: 1 0 38%;
+    }
+    #param-dashboard-inner {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      overflow-x: visible;
+      gap: 8px;
+    }
+    .param-card {
+      min-width: calc(50% - 6px);
+      max-width: none;
+      margin-bottom: 10px;
+      padding: 10px 10px;
+      gap: 3px;
+    }
+    #main-status-panel {
+      flex: 1 1 35%;
+      margin: 0;
+      align-self: center;
+      padding: 20px 12px;
+    }
+    #controls-area {
+      flex-direction: column;
+      gap: 10px;
+      flex: 1 0 27%;
+      margin-top: 0;
+      align-self: flex-end;
+      padding: 0 14px 14px;
+      justify-content: space-around;
+    }
+    #joystick-area {
+      margin-top: 0;
+      padding: 0 0 14px 0;
+      justify-content: flex-start;
+      align-items: center;
+      flex-grow: 1;
+      max-width: 150px;
+    }
+    #joystick-container {
+      width: 150px;
+      height: 150px;
+    }
+    #joystick-knob {
+      width: 48px;
+      height: 48px;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app" role="main" aria-label="Cryostat Control">
+  <!-- HEADER -->
+  <header>
+    <div class="title-section">
+      <h1>CryostatControl</h1>
+      <div role="status" aria-live="polite" class="status-indicator" tabindex="0" aria-label="Bluetooth connection status">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-text">Disconnected</span>
+      </div>
+      <span class="last-update" aria-live="polite" aria-atomic="true" id="last-update" tabindex="0">Last update: --</span>
+    </div>
+    <button class="menu-btn" aria-label="Open menu" aria-haspopup="true" aria-controls="menu-panel" tabindex="0">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+    </button>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main id="main-content">
+    <section id="param-dashboard" aria-label="Instrument parameters" tabindex="0">
+      <div id="param-dashboard-inner" aria-live="polite">
+        <!-- parameter cards inserted dynamically -->
+      </div>
+      <!-- Micron cut size control inserted here -->
+      <div class="micron-control" aria-label="Micron cut size selection" role="group">
+        <label for="micron-input" class="micron-label">Section Thickness (µm)</label>
+        <div class="micron-input-container">
+          <button type="button" aria-label="Decrease section thickness" id="btn-decrement" class="micron-btn">−</button>
+          <input
+            type="number"
+            id="micron-input"
+            class="micron-input"
+            step="0.5"
+            min="1"
+            max="20"
+            value="5.6"
+            inputmode="decimal"
+            aria-live="polite"
+            aria-describedby="micron-desc"
+          />
+          <button type="button" aria-label="Increase section thickness" id="btn-increment" class="micron-btn">+</button>
+        </div>
+        <div id="micron-desc" class="micron-desc">Select the cut size from 1 to 20 microns in 0.5 increments.</div>
+      </div>
+    </section>
+
+    <section id="main-status-panel" aria-label="Main status and readout" tabindex="0">
+      <div id="cut-count" aria-live="polite" aria-atomic="true" aria-label="Current cut count">0</div>
+      <div id="machine-mode" aria-live="polite" aria-atomic="true" aria-label="Machine operating mode">Standby</div>
+      <div id="cooldown-container" aria-label="Run/cooldown progress">
+        <svg id="cooldown-svg" aria-hidden="true" viewBox="0 0 120 120" >
+          <circle cx="60" cy="60" r="54" stroke="#dbe9ec" stroke-width="12" fill="none"></circle>
+          <circle id="cooldown-progress" cx="60" cy="60" r="54" stroke="var(--accent-color)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="339.292" stroke-dashoffset="339.292" transform="rotate(-90 60 60)"></circle>
+        </svg>
+        <div id="cooldown-text">0%</div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;">
+      <nav id="controls-area" aria-label="Control buttons" role="toolbar">
+        <button type="button" aria-label="Home" id="btnHome">Home</button>
+        <button type="button" aria-label="Cut" id="btnCut">Cut</button>
+        <button type="button" aria-label="Fast Cut" id="btnFastCut">Fast-Cut</button>
+        <button type="button" aria-label="Pause" id="btnPause">Pause</button>
+        <button type="button" aria-label="Stop" id="btnStop">Stop</button>
+        <button type="button" aria-label="Settings" id="btnSettings">Settings</button>
+      </nav>
+      <div id="joystick-area" aria-label="Joystick for precise control" role="application" tabindex="0" aria-live="polite" aria-atomic="true">
+        <div id="joystick-label">Carriage control</div>
+        <div id="joystick-container" role="slider" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-valuetext="Neutral" tabindex="0" aria-describedby="joystick-output">
+          <div id="joystick-ring"></div>
+          <div id="joystick-knob" tabindex="0" aria-label="Joystick control knob" role="button" aria-pressed="false"></div>
+        </div>
+        <div id="joystick-output" aria-live="polite" aria-atomic="true" aria-label="Joystick position value">0.00</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // Existing JS code here...
+
+  const sampleParams = {
+    temperature: { label: "Temperature", value: 4.2, units: "°C", trend: 1, status: "ok", tooltip: "Current chamber temperature" },
+    sectionThickness: { label: "Section thickness", value: 5.6, units: "µm", trend: -1, status: "warn", tooltip: "Thickness of cut sections" },
+    chamberHumidity: { label: "Chamber humidity", value: 61, units: "%", trend: 0, status: "ok", tooltip: "Relative humidity inside chamber" },
+    bladeAngle: { label: "Blade angle", value: 12, units: "°", trend: 0, status: "ok" },
+    motorRPM: { label: "Motor RPM", value: 120, units: "rpm", trend: 1, status: "alert", tooltip: "Revolutions per minute of motor" },
+    vacuum: { label: "Vacuum", value: 850, units: "mbar", trend: 0, status: "ok" },
+    samplePosition: { label: "Sample position", value: 8.5, units: "mm", trend: -1, status: "ok" }
+  };
+  let cutCount = 0;
+  let machineMode = "Standby";
+  let cooldownPercent = 0;
+  const paramDashboardInner = document.getElementById("param-dashboard-inner");
+  const lastUpdateElt = document.getElementById("last-update");
+  const connDot = document.getElementById("conn-dot");
+  const connText = document.getElementById("conn-text");
+  const cutCountElt = document.getElementById("cut-count");
+  const machineModeElt = document.getElementById("machine-mode");
+  const cooldownProgress = document.getElementById("cooldown-progress");
+  const cooldownText = document.getElementById("cooldown-text");
+  const joystickKnob = document.getElementById("joystick-knob");
+  const joystickContainer = document.getElementById("joystick-container");
+  const joystickOutput = document.getElementById("joystick-output");
+
+  function setConnectionStatus(connected) {
+    if (connected) {
+      connDot.classList.add("status-connected");
+      connDot.classList.remove("status-alert");
+      connText.textContent = "Connected";
+    } else {
+      connDot.classList.remove("status-connected");
+      connText.textContent = "Disconnected";
+    }
+  }
+  setConnectionStatus(true);
+
+  function createParamCard(id, param) {
+    const article = document.createElement("article");
+    article.className = "param-card";
+    article.id = "param-" + id;
+    article.tabIndex = 0;
+    const labelDiv = document.createElement("div");
+    labelDiv.className = "param-label";
+    labelDiv.textContent = param.label;
+    article.appendChild(labelDiv);
+    const valueRow = document.createElement("div");
+    valueRow.className = "param-value-row";
+    const valUnitContainer = document.createElement("div");
+    valUnitContainer.style.display = "flex";
+    valUnitContainer.style.alignItems = "center";
+    valUnitContainer.style.gap = "4px";
+    const valSpan = document.createElement("span");
+    valSpan.className = "param-value";
+    valSpan.textContent = param.value.toFixed(1);
+    valSpan.setAttribute("aria-live", "polite");
+    valUnitContainer.appendChild(valSpan);
+    const unitSpan = document.createElement("span");
+    unitSpan.className = "param-units";
+    unitSpan.textContent = param.units || "";
+    valUnitContainer.appendChild(unitSpan);
+    if (param.trend !== 0) {
+      const trendSpan = document.createElement("span");
+      trendSpan.className = "trend-icon";
+      if (param.trend > 0) {
+        trendSpan.classList.add("trend-up");
+        trendSpan.textContent = "▲";
+        trendSpan.setAttribute("aria-label", "Increasing");
+      } else if (param.trend < 0) {
+        trendSpan.classList.add("trend-down");
+        trendSpan.textContent = "▼";
+        trendSpan.setAttribute("aria-label", "Decreasing");
+      }
+      trendSpan.setAttribute("aria-hidden", "true");
+      valUnitContainer.appendChild(trendSpan);
+    }
+    valueRow.appendChild(valUnitContainer);
+    const statusDot = document.createElement("div");
+    statusDot.className = "status-dot-small tooltip";
+    statusDot.tabIndex = 0;
+    let statusClass = "status-ok";
+    if (param.status === "warn") statusClass = "status-warn";
+    else if (param.status === "alert") statusClass = "status-alert";
+    statusDot.classList.add(statusClass);
+    statusDot.setAttribute("aria-label", "Status: " + param.status.toUpperCase());
+    valueRow.appendChild(statusDot);
+    if (param.tooltip) {
+      const tooltipText = document.createElement("span");
+      tooltipText.className = "tooltip-text";
+      tooltipText.id = "tooltip-" + id;
+      tooltipText.textContent = param.tooltip;
+      statusDot.setAttribute("aria-describedby", tooltipText.id);
+      statusDot.appendChild(tooltipText);
+    }
+    article.appendChild(valueRow);
+    return article;
+  }
+
+  function renderDashboard(params) {
+    paramDashboardInner.innerHTML = "";
+    Object.entries(params).forEach(([id, param]) => {
+      const card = createParamCard(id, param);
+      paramDashboardInner.appendChild(card);
+    });
+  }
+
+  function updateStatusPanel(cutCnt, mode, cooldown) {
+    cutCountElt.textContent = cutCnt.toString();
+    machineModeElt.textContent = mode;
+    cooldownPercent = cooldown;
+    cooldownText.textContent = `${cooldownPercent.toFixed(0)}%`;
+    const circumference = 2 * Math.PI * 54;
+    const offset = circumference * (1 - cooldownPercent / 100);
+    cooldownProgress.style.strokeDashoffset = offset;
+  }
+
+  function updateParameters(params) {
+    Object.entries(params).forEach(([id, param]) => {
+      const card = document.getElementById("param-" + id);
+      if (!card) return;
+      const valSpan = card.querySelector(".param-value");
+      const statusDot = card.querySelector(".status-dot-small");
+      if (valSpan) valSpan.textContent = param.value.toFixed(1);
+      const trendIcon = card.querySelector(".trend-icon");
+      if (trendIcon) {
+        if (param.trend > 0) {
+          trendIcon.textContent = "▲";
+          trendIcon.className = "trend-icon trend-up";
+          trendIcon.setAttribute("aria-label", "Increasing");
+        } else if (param.trend < 0) {
+          trendIcon.textContent = "▼";
+          trendIcon.className = "trend-icon trend-down";
+          trendIcon.setAttribute("aria-label", "Decreasing");
+        } else {
+          trendIcon.textContent = "";
+          trendIcon.className = "trend-icon";
+          trendIcon.removeAttribute("aria-label");
+        }
+      }
+      if (statusDot) {
+        statusDot.classList.remove("status-ok", "status-warn", "status-alert");
+        let statusClass = "status-ok";
+        if (param.status === "warn") statusClass = "status-warn";
+        else if (param.status === "alert") statusClass = "status-alert";
+        statusDot.classList.add(statusClass);
+        statusDot.setAttribute("aria-label", "Status: " + param.status.toUpperCase());
+        let tooltipText = statusDot.querySelector(".tooltip-text");
+        if (param.tooltip && tooltipText) {
+          tooltipText.textContent = param.tooltip;
+        }
+      }
+    });
+    updateTimestamp();
+  }
+
+  function updateTimestamp() {
+    const now = new Date();
+    lastUpdateElt.textContent = "Last update: " + now.toLocaleTimeString();
+  }
+
+  // Joystick class and initialization - omitted here for brevity; unchanged
+
+  // Initialize dashboard etc.
+  renderDashboard(sampleParams);
+  updateStatusPanel(cutCount, machineMode, cooldownPercent);
+  updateTimestamp();
+  
+  // Controls demo logs
+  ["Home", "Cut", "FastCut", "Pause", "Stop", "Settings"].forEach(id => {
+    document.getElementById("btn" + id).addEventListener("click", () => {
+      console.log(`${id} button pressed`);
+    });
+  });
+
+
+  // Micron cut size control logic
+  (function() {
+    const input = document.getElementById("micron-input");
+    const btnDec = document.getElementById("btn-decrement");
+    const btnInc = document.getElementById("btn-increment");
+  
+    const STEP = 0.5;
+    const MIN = 1;
+    const MAX = 20;
+  
+    function clampValue(val) {
+      if (isNaN(val)) return MIN;
+      val = Math.min(MAX, Math.max(MIN, val));
+      // Round to nearest step multiple
+      return Math.round(val / STEP) * STEP;
+    }
+  
+    function updateInputValue(newVal) {
+      input.value = newVal.toFixed(1);
+      // Optionally sync param and UI here or call BLE write
+      sampleParams.sectionThickness.value = newVal;
+      sampleParams.sectionThickness.trend = (newVal > sampleParams.sectionThickness.value ? 1 : -1);
+      updateParameters(sampleParams);
+      updateTimestamp();
+      console.log("Section thickness set to:", newVal);
+    }
+  
+    btnDec.addEventListener("click", () => {
+      const current = clampValue(parseFloat(input.value));
+      let newVal = clampValue(current - STEP);
+      updateInputValue(newVal);
+    });
+  
+    btnInc.addEventListener("click", () => {
+      const current = clampValue(parseFloat(input.value));
+      let newVal = clampValue(current + STEP);
+      updateInputValue(newVal);
+    });
+  
+    input.addEventListener("input", () => {
+      // Validate input live; allow empty for typing ease
+      let val = parseFloat(input.value);
+      if (input.value === "" || isNaN(val)) return;
+      val = clampValue(val);
+      input.value = val.toFixed(1);
+    });
+  
+    input.addEventListener("change", () => {
+      // Finalize input on blur or enter
+      let val = parseFloat(input.value);
+      if (isNaN(val)) val = MIN;
+      val = clampValue(val);
+      updateInputValue(val);
+    });
+  })();
+
+</script>
+</body>
+</html>
